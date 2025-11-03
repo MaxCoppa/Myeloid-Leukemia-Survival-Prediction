@@ -21,6 +21,8 @@ def model_selection_using_kfold(
     n_splits: int = 8,
     log: bool = False,
     log_note: str = None,
+    scale: bool = False,
+    n_importance: int = 10,
 ):
     """
     Perform K-Fold cross-validation for model selection,
@@ -49,9 +51,10 @@ def model_selection_using_kfold(
         X_local_train = data_local_train[features]
         X_local_test = data_local_test[features]
 
-        # scaler = StandardScaler()
-        # X_local_train = scaler.fit_transform(X_local_train)
-        # X_local_test = scaler.transform(X_local_test)
+        if scale:
+            scaler = StandardScaler()
+            X_local_train = scaler.fit_transform(X_local_train)
+            X_local_test = scaler.transform(X_local_test)
 
         imputer = SimpleImputer(strategy="median")
         X_local_train = imputer.fit_transform(X_local_train)
@@ -109,7 +112,7 @@ def model_selection_using_kfold(
     # Feature importance
     if plot_ft_importance:
         try:
-            plot_feature_importance(models, features)
+            plot_feature_importance(models, features, n_importance)
         except Exception:
             print("No possible to get feature importance for this model.")
 
@@ -121,7 +124,7 @@ def get_data(ids, unique_vals, col: pd.Series, X_data: pd.DataFrame, y_data: pd.
     return X_data.loc[mask], y_data.loc[mask], mask
 
 
-def plot_feature_importance(models, features):
+def plot_feature_importance(models, features, n_importance=10):
     """
     Plot mean feature importance across trained models and log top features if required.
     """
@@ -130,9 +133,9 @@ def plot_feature_importance(models, features):
     )
     mean_importance = feature_importances.mean().sort_values(ascending=False)
 
-    top_features = mean_importance.head(10).index.tolist()
+    top_features = mean_importance.head(n_importance).index.tolist()
 
-    print("\nTop 10 important features:")
+    print(f"\nTop {n_importance} important features:")
     print(top_features)
 
     sns.barplot(

@@ -47,7 +47,7 @@ model_params = {
         "max_iter": 1000,
     },
     # Tree-based regressors
-    "rf": {"n_estimators": 20, "max_depth": 2, "random_state": 42},
+    "rf": {"n_estimators": 20, "max_depth": 3, "random_state": 42},
     "xgb": {
         "n_estimators": 10,
         "max_depth": 5,
@@ -79,7 +79,7 @@ model_params = {
     },
     "lgbm": {
         "n_estimators": 50,
-        "max_depth": -1,
+        "max_depth": 5,
         "learning_rate": 0.05,
         "subsample": 0.8,
         "colsample_bytree": 0.8,
