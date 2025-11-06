@@ -1,10 +1,18 @@
 # %%
-
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from tree_based_models import model_selection_using_kfold, get_model
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
+from typing import Tuple
+import re
+
+from feature_engineering import (
+    one_hot_aggregate,
+    add_cytogenetic_features,
+    create_molecular_feat,
+)
 
 # %%
 # Clinical Data
@@ -22,7 +30,7 @@ clinical_train.head()
 # %%
 train = pd.concat(
     [
-        clinical_train.set_index("ID").select_dtypes(include="number"),
+        clinical_train.set_index("ID"),
         target_train.set_index("ID"),
     ],
     axis=1,
@@ -30,74 +38,52 @@ train = pd.concat(
 train = train[~train["OS_YEARS"].isna()]
 train.head()
 # %%
-molecular_train.nunique()
+
+
+def feat_engineering(
+    data: pd.DataFrame, molecular_data: pd.DataFrame
+) -> tuple[pd.DataFrame, list]:
+
+    data = create_molecular_feat(data=data, molecular_data=molecular_data)
+    data, col_clinical = add_cytogenetic_features(data)
+    data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
+    data, chromosomes = one_hot_aggregate(
+        molecular_data, data, "CHR", fillna_value="no_chr"
+    )
+    data, genes = one_hot_aggregate(
+        molecular_data, data, "GENE", fillna_value="no_gene"
+    )
+
+    new_feats = list(categories) + list(chromosomes) + list(genes) + list(col_clinical)
+
+    return data, new_feats
+
 
 # %%
-molecular_train.head()
+train, feat_train = feat_engineering(data=train, molecular_data=molecular_train)
+# %% Preprocessing Test Data
+test = clinical_test.set_index("ID").copy()
+not_molecular_test = clinical_test[
+    clinical_test["ID"].isin(
+        [
+            id
+            for id in clinical_test["ID"].unique()
+            if id not in molecular_test["ID"].unique()
+        ]
+    )
+].set_index("ID")
+
+test, feat_test = feat_engineering(data=test, molecular_data=molecular_test)
+
+feats = [ft for ft in feat_test if ft in feat_train]
 # %%
-molecular_train["LENGTH"] = molecular_train["END"] - molecular_train["START"]
-# %%
-tmp = molecular_train.groupby("ID").size().to_frame("Nmut")
-length = molecular_train.groupby("ID")["LENGTH"].sum()
-vaf = molecular_train.groupby("ID")["VAF"].sum()
 
-train = train.merge(tmp, left_index=True, right_index=True, how="inner")
-train = train.merge(vaf, left_index=True, right_index=True, how="inner")
-train = train.merge(length, left_index=True, right_index=True, how="inner")
-
-# %% One Hot Encoding Effect mutation
-
-oht = OneHotEncoder(sparse_output=False)
-encoding = oht.fit_transform(molecular_train[["EFFECT"]])
-categories = oht.categories_
-
-for i, cat in enumerate(categories[0]):
-    molecular_train[cat] = encoding[:, i]
-
-for cat in categories:
-    new_col = molecular_train.groupby("ID")[cat].sum()
-    train = train.merge(new_col, left_index=True, right_index=True, how="inner")
-
-# %% One Hot Encoding Chromosom
-
-oht = OneHotEncoder(sparse_output=False)
-encoding = oht.fit_transform(molecular_train[["CHR"]].fillna("no_chr"))
-chromosomes = oht.categories_
-
-for i, cat in enumerate(chromosomes[0]):
-    molecular_train[cat] = encoding[:, i]
-
-for cat in chromosomes:
-    new_col = molecular_train.groupby("ID")[cat].sum()
-    train = train.merge(new_col, left_index=True, right_index=True, how="inner")
-
-# %% One Hot Encoding Genes
-
-oht = OneHotEncoder(sparse_output=False)
-encoding = oht.fit_transform(molecular_train[["GENE"]].fillna("no_gene"))
-genes = oht.categories_
-
-for i, cat in enumerate(genes[0]):
-    molecular_train[cat] = encoding[:, i]
-
-for cat in genes:
-    new_col = molecular_train.groupby("ID")[cat].sum()
-    train = train.merge(new_col, left_index=True, right_index=True, how="inner")
-
-
+not_molecular_test, col_clinical = add_cytogenetic_features(not_molecular_test)
+test = pd.concat([test, not_molecular_test])
 # %%
 target = "OS_YEARS"
-features = (
-    ["BM_BLAST", "WBC", "HB", "PLT", "Nmut", "VAF", "LENGTH"]
-    + list(categories[0])
-    + list(chromosomes[0])
-    + list(genes[0])
-)
+features = ["BM_BLAST", "WBC", "HB", "PLT", "Nmut", "VAF", "LENGTH"] + feats
 model_type = "cat"
-
-
-# features = ['PLT', 'VAF', 'HB', 'BM_BLAST', 'WBC', 'Nmut', 'TP53', 'LENGTH', 'non_synonymous_codon', 'SF3B1', '21', '17', 'stop_gained', '1', '20', 'NFE2', 'ASXL1', 'frameshift_variant', 'RUNX1', '5', '4', '2', '12', 'MLL', 'splice_site_variant']
-# features = ['PLT', 'HB', 'BM_BLAST', 'VAF', 'TP53', 'WBC', 'non_synonymous_codon', 'Nmut', 'SF3B1', '21', '17', 'NFE2', 'LENGTH', 'stop_gained', 'MYC', '20', 'frameshift_variant', 'ASXL1', '12', '2']
 
 # %%
 model_selection_using_kfold(
@@ -114,6 +100,20 @@ model_selection_using_kfold(
     n_importance=20,
 )
 
-# %%
+# %% Fit model on the whole DataSet
 
+model = get_model(model_type=model_type)
+model.fit(train[features], train[target])
+
+# %%
+preds = -model.predict(test[features])
+
+submission = pd.Series(preds, index=test.index, name="risk_score")
+# %%
+submission.to_csv("data/cat_feat_engineering_cypt.csv")
+
+# %%
+len(
+    set(pd.read_csv("data/benchmark_submission.csv")["ID"]) & set(submission.index)
+) / len(set(submission.index))
 # %%
