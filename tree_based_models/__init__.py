@@ -7,11 +7,13 @@ __all__ = [
     "ResidualModel",
     "EnsembleRegressor",
     "EnsembleClassifier",
+    "model_selection_using_kfold_surv",
 ]
 
 from .selection import (
     model_selection_using_kfold,
     kfold_general_with_residuals,
+    model_selection_using_kfold_surv,
 )
 from .evaluation import evaluate_model
 from .tuning import tune_model

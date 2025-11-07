@@ -1,3 +1,3 @@
-__all__ = ["evaluate_model"]
+__all__ = ["evaluate_model", "evaluate_model_surv"]
 
-from .evaluate import evaluate_model
+from .evaluate import evaluate_model, evaluate_model_surv
