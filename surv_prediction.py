@@ -38,10 +38,18 @@ train.head()
 
 # %%
 def feat_engineering(
-    data: pd.DataFrame, molecular_data: pd.DataFrame
+    data: pd.DataFrame,
+    molecular_data: pd.DataFrame,
 ) -> tuple[pd.DataFrame, list]:
 
+    ids_not_molecular = [
+        id for id in data.index.unique() if id not in molecular_data["ID"].unique()
+    ]
+
+    not_molecular = data[data.index.isin(ids_not_molecular)]
+
     data = create_molecular_feat(data=data, molecular_data=molecular_data)
+
     data, col_clinical = add_cytogenetic_features(data)
     data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
     data, chromosomes = one_hot_aggregate(
@@ -53,11 +61,17 @@ def feat_engineering(
 
     new_feats = list(categories) + list(chromosomes) + list(genes) + list(col_clinical)
 
+    not_molecular, col_clinical = add_cytogenetic_features(not_molecular)
+    data = pd.concat([data, not_molecular])
+    data[list(categories) + list(chromosomes) + list(genes)] = data[
+        list(categories) + list(chromosomes) + list(genes)
+    ].fillna(0)
     return data, new_feats
 
 
 # %%
 train, feats = feat_engineering(data=train, molecular_data=molecular_train)
+train
 
 # %%
 target = "OS_YEARS"
@@ -75,7 +89,7 @@ best_params = {
 model_cls = RandomSurvivalForest
 
 model_params = {
-    "n_estimators": 150,
+    "n_estimators": 200,
     "max_depth": 15,
     "min_weight_fraction_leaf": 0.005,
     "random_state": 42,
