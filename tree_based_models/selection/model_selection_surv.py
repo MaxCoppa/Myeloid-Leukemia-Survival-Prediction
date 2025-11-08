@@ -62,9 +62,9 @@ def model_selection_using_kfold_surv(
         X_test = imputer.transform(X_test)
 
         # Scale numeric features
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
+        # scaler = StandardScaler()
+        # X_train = scaler.fit_transform(X_train)
+        # X_test = scaler.transform(X_test)
 
         y_train = Surv.from_dataframe(status, target, data_train)
         y_test = Surv.from_dataframe(status, target, data_test)

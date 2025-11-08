@@ -11,6 +11,8 @@ from feature_engineering import (
     create_molecular_feat,
 )
 
+from sksurv.util import Surv
+
 # %%
 # Clinical Data
 clinical_train = pd.read_csv("data/X_train/clinical_train.csv")
@@ -40,6 +42,7 @@ train.head()
 def feat_engineering(
     data: pd.DataFrame,
     molecular_data: pd.DataFrame,
+    fill_not_molecular=False,
 ) -> tuple[pd.DataFrame, list]:
 
     ids_not_molecular = [
@@ -48,7 +51,9 @@ def feat_engineering(
 
     not_molecular = data[data.index.isin(ids_not_molecular)]
 
-    data = create_molecular_feat(data=data, molecular_data=molecular_data)
+    data, molecular_feat = create_molecular_feat(
+        data=data, molecular_data=molecular_data
+    )
 
     data, col_clinical = add_cytogenetic_features(data)
     data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
@@ -59,24 +64,47 @@ def feat_engineering(
         molecular_data, data, "GENE", fillna_value="no_gene"
     )
 
-    new_feats = list(categories) + list(chromosomes) + list(genes) + list(col_clinical)
+    new_feats = list(col_clinical) + list(categories) + list(chromosomes) + list(genes)
 
     not_molecular, col_clinical = add_cytogenetic_features(not_molecular)
-    data = pd.concat([data, not_molecular])
-    data[list(categories) + list(chromosomes) + list(genes)] = data[
-        list(categories) + list(chromosomes) + list(genes)
-    ].fillna(0)
+
+    if fill_not_molecular:
+        data = pd.concat([data, not_molecular])
+        data[
+            list(categories) + list(chromosomes) + list(genes) + list(molecular_feat)
+        ] = data[
+            list(categories) + list(chromosomes) + list(genes) + list(molecular_feat)
+        ].fillna(
+            0
+        )
+
     return data, new_feats
 
 
 # %%
-train, feats = feat_engineering(data=train, molecular_data=molecular_train)
-train
+test = clinical_test.set_index("ID").copy()
+not_molecular_test = clinical_test[
+    clinical_test["ID"].isin(
+        [
+            id
+            for id in clinical_test["ID"].unique()
+            if id not in molecular_test["ID"].unique()
+        ]
+    )
+].set_index("ID")
 
+train, feat_train = feat_engineering(
+    data=train, molecular_data=molecular_train, fill_not_molecular=False
+)
+test, feat_test = feat_engineering(
+    data=test, molecular_data=molecular_test, fill_not_molecular=True
+)
+
+feats = [ft for ft in feat_test if ft in feat_train]
 # %%
 target = "OS_YEARS"
 status = "OS_STATUS"
-features = ["BM_BLAST", "WBC", "HB", "PLT", "Nmut", "VAF"] + feats
+features = ["BM_BLAST", "WBC", "HB", "PLT", "Nmut", "VAF", "LENGTH"] + feats
 
 # %%
 
@@ -110,4 +138,26 @@ model_selection_using_kfold_surv(
     log=False,
 )
 
+# %%
+X_train = train[features]
+X_test = test[features]
+
+imputer = SimpleImputer(strategy="median")
+X_train = imputer.fit_transform(X_train)
+X_test = imputer.transform(X_test)
+
+y_train = Surv.from_dataframe(status, target, train)
+
+model = model_cls(**model_params)
+model.fit(X_train, y_train)
+
+# %%
+preds = model.predict(X_test)
+
+submission = pd.Series(preds, index=test.index, name="risk_score")
+submission.to_csv("data/surv_feat_engineering_cypt.csv")
+
+len(
+    set(pd.read_csv("data/benchmark_submission.csv")["ID"]) & set(submission.index)
+) / len(set(submission.index))
 # %%
