@@ -128,4 +128,4 @@ def create_molecular_feat(
     data = data.merge(vaf, left_index=True, right_index=True, how="inner")
     data = data.merge(length, left_index=True, right_index=True, how="inner")
 
-    return data
+    return data, ["LENGTH", "Nmut", "VAF"]
