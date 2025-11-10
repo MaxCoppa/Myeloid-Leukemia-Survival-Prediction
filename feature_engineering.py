@@ -44,7 +44,7 @@ def feat_engineering(
     data: pd.DataFrame, molecular_data: pd.DataFrame
 ) -> tuple[pd.DataFrame, list]:
 
-    data,_ = create_molecular_feat(data=data, molecular_data=molecular_data)
+    data, _ = create_molecular_feat(data=data, molecular_data=molecular_data)
     data, col_clinical = add_cytogenetic_features(data)
     data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
     data, chromosomes = one_hot_aggregate(
