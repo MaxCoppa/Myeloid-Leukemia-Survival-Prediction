@@ -4,8 +4,6 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression, Ridge, Lasso
 from sklearn.ensemble import RandomForestRegressor
 
-from xgboost import XGBRegressor, XGBClassifier
-from lightgbm import LGBMRegressor, LGBMClassifier
 from catboost import CatBoostRegressor
 from .ensemble import EnsembleClassifier, EnsembleRegressor
 from sklearn.linear_model import LogisticRegression
@@ -130,14 +128,6 @@ model_registry = {
     "ridge_benchmark": Ridge,
     "lasso": Lasso,
     "rf": RandomForestRegressor,
-    "xgb": XGBRegressor,
-    "xgb_opt": XGBRegressor,
-    "xgb_objective": XGBRegressor,
-    "xgb_classif": XGBClassifier,
-    "lgbm": LGBMRegressor,
-    "lgbm_opt": LGBMRegressor,
-    "lgbm_chat": LGBMRegressor,
-    "lgbm_classif": LGBMClassifier,
     "cat": CatBoostRegressor,
 }
 
