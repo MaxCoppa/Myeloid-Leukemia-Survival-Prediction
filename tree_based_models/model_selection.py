@@ -6,8 +6,8 @@ from datetime import datetime
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from ..models import get_model
-from ..evaluation import evaluate_model
+from .initialise_model import get_model
+from .evaluate import evaluate_model
 
 
 def model_selection_using_kfold(
