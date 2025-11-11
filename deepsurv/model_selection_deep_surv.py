@@ -1,21 +1,15 @@
-"""
-DeepSurv K-Fold Model Selection (PyTorch)
------------------------------------------
-Perform k-fold cross-validation using DeepSurv neural Cox model.
-"""
-
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import KFold
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
-from lifelines.utils import concordance_index
 from datetime import datetime
+from sksurv.util import Surv
 
-# Assuming DeepSurv + training utils are in deepsurv_pytorch.py
 from .deep_surv import DeepSurv
-from .train_deepsurv import train_deepsurv
+from .train import train_deepsurv
+from .evaluate import evaluate_model
 
 
 def model_selection_using_kfold_deepsurv(
@@ -28,7 +22,7 @@ def model_selection_using_kfold_deepsurv(
     n_splits: int = 5,
     n_epochs: int = 100,
     lr: float = 1e-3,
-    l2_reg: float = 1e-4,
+    weight_decay: float = 1e-4,
     l1_reg: float = 0.0,
     feat_engineering=None,
     unique_id: str = "ROW_ID",
@@ -37,25 +31,8 @@ def model_selection_using_kfold_deepsurv(
     log_note: str = None,
 ):
     """
-    Perform K-Fold cross-validation with DeepSurv (PyTorch).
-
-    Args:
-        data: DataFrame with features + survival targets.
-        features: list of column names for X.
-        target: survival time column.
-        status: event indicator column (1 = event, 0 = censored).
-        hidden_layers_sizes: list of hidden layer sizes.
-        dropout: dropout probability.
-        n_splits: number of CV folds.
-        n_epochs: number of training epochs.
-        lr: learning rate.
-        l2_reg: L2 weight decay.
-        l1_reg: L1 regularization strength.
-        feat_engineering: optional callable to apply feature engineering.
-        unique_id: column identifying unique subjects.
-        device: 'cpu' or 'cuda'.
-        log: whether to append results to log file.
-        log_note: extra notes for logging.
+    Perform K-Fold cross-validation with DeepSurv (PyTorch),
+    evaluated using IPC-weighted C-index (via sksurv).
     """
 
     unique_vals = data[unique_id].unique()
@@ -65,16 +42,12 @@ def model_selection_using_kfold_deepsurv(
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     for i, (train_idx, test_idx) in enumerate(kf.split(unique_vals)):
-        print(f"\n===== Fold {i+1}/{n_splits} =====")
 
         train_ids = unique_vals[train_idx]
         test_ids = unique_vals[test_idx]
 
-        train_mask = data[unique_id].isin(train_ids)
-        test_mask = data[unique_id].isin(test_ids)
-
-        df_train = data.loc[train_mask].copy()
-        df_test = data.loc[test_mask].copy()
+        df_train = data.loc[data[unique_id].isin(train_ids)].copy()
+        df_test = data.loc[data[unique_id].isin(test_ids)].copy()
 
         # Optional feature engineering
         if feat_engineering:
@@ -84,10 +57,8 @@ def model_selection_using_kfold_deepsurv(
         # Separate features and targets
         X_train = df_train[features]
         X_test = df_test[features]
-        t_train = df_train[target].astype(np.float32)
-        e_train = df_train[status].astype(np.float32)
-        t_test = df_test[target].astype(np.float32)
-        e_test = df_test[status].astype(np.float32)
+        y_train = df_train[[status, target]].copy()
+        y_test = df_test[[status, target]].copy()
 
         # Handle missing values
         imputer = SimpleImputer(strategy="median")
@@ -109,17 +80,17 @@ def model_selection_using_kfold_deepsurv(
         )
 
         # Train model
-        hist = train_deepsurv(
+        _ = train_deepsurv(
             model,
             x_train=X_train,
-            e_train=e_train.values,
-            t_train=t_train.values,
+            e_train=y_train[status].values.astype(np.float32),
+            t_train=y_train[target].values.astype(np.float32),
             x_valid=X_test,
-            e_valid=e_test.values,
-            t_valid=t_test.values,
+            e_valid=y_test[status].values.astype(np.float32),
+            t_valid=y_test[target].values.astype(np.float32),
             n_epochs=n_epochs,
             lr=lr,
-            weight_decay=l2_reg,
+            weight_decay=weight_decay,
             l1_reg=l1_reg,
             device=device,
             verbose=False,
@@ -127,18 +98,28 @@ def model_selection_using_kfold_deepsurv(
 
         models.append(model)
 
-        # Compute final metrics
-        with torch.no_grad():
-            risk_train = -(model.predict_risk(X_train))
-            risk_test = -(model.predict_risk(X_test))
-            cindex_train = concordance_index(t_train, risk_train, e_train)
-            cindex_test = concordance_index(t_test, risk_test, e_test)
+        # --- Evaluate using IPC-weighted concordance index ---
+        model_eval = evaluate_model(
+            model=model,
+            X_train=X_train,
+            X_test=X_test,
+            y_train=y_train,
+            y_test=y_test,
+            target=target,
+            status=status,
+            tau=7,
+            verbose=False,
+            log=False,
+        )
+
+        cindex_train = model_eval["cindex_train"]
+        cindex_test = model_eval["cindex_test"]
 
         metrics["cindex_train"].append(cindex_train)
         metrics["cindex_test"].append(cindex_test)
 
         print(
-            f"Fold {i+1}: C-index (Train: {cindex_train:.4f} | Test: {cindex_test:.4f})"
+            f"Fold {i+1} - IPCW C-index (Train: {cindex_train:.4f} | Test: {cindex_test:.4f})"
         )
 
     # --- Aggregate results ---
@@ -151,7 +132,7 @@ def model_selection_using_kfold_deepsurv(
     )
 
     print(
-        f"\nConcordance Index (Test): {mean_c:.4f} ± {std_c:.4f} "
+        f"\nConcordance Index (Test, IPCW): {mean_c:.4f} ± {std_c:.4f} "
         f"[Min: {min_c:.4f} ; Max: {max_c:.4f}]"
     )
 
@@ -161,7 +142,7 @@ def model_selection_using_kfold_deepsurv(
         note_str = f" | Note: {log_note}" if log_note else ""
         with open(logfile, "a") as f:
             f.write(
-                f"{datetime.now()} - DeepSurv: Mean C-index: {mean_c:.4f} | Std: {std_c:.4f} | "
+                f"{datetime.now()} - DeepSurv (IPCW): Mean C-index: {mean_c:.4f} | Std: {std_c:.4f} | "
                 f"Min: {min_c:.4f} | Max: {max_c:.4f}{note_str}\n"
             )
 

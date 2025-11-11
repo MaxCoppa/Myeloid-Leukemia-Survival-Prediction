@@ -7,8 +7,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 from sksurv.util import Surv
 
-from ..models import get_model
-from ..evaluation import evaluate_model_surv
+from .initialise_model import get_model
+from .evaluate import evaluate_model_surv
 
 
 def model_selection_using_kfold_surv(

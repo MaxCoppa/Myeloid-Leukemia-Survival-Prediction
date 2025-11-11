@@ -1,12 +1,14 @@
 # %%
+"""
+Comprehensive Feature Engineering for Survival Modeling
+------------------------------------------------------
+This script applies an extended feature engineering pipeline combining
+clinical, molecular, and cytogenetic data for survival prediction.
+"""
+
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from tree_based_models import model_selection_using_kfold, get_model
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
-from typing import Tuple
-import re
 
 from feature_engineering import (
     one_hot_aggregate,
@@ -37,31 +39,68 @@ train = pd.concat(
 )
 train = train[~train["OS_YEARS"].isna()]
 train.head()
+
+
 # %%
-
-
 def feat_engineering(
-    data: pd.DataFrame, molecular_data: pd.DataFrame
+    data: pd.DataFrame,
+    molecular_data: pd.DataFrame,
+    fill_not_molecular=False,
 ) -> tuple[pd.DataFrame, list]:
+    """Apply domain-specific feature engineering for DeepSurv."""
 
-    data, _ = create_molecular_feat(data=data, molecular_data=molecular_data)
+    # Identify patients with no molecular data
+    ids_not_molecular = [
+        pid for pid in data.index.unique() if pid not in molecular_data["ID"].unique()
+    ]
+    not_molecular = data[data.index.isin(ids_not_molecular)]
+
+    # === 1. Molecular Features ===
+    # Aggregates mutation-based numerical features (e.g., count, mean VAF, length)
+    data, molecular_feat = create_molecular_feat(
+        data=data, molecular_data=molecular_data
+    )
+
+    # === 2. Cytogenetic Features ===
+    # Adds features describing cytogenetic abnormalities (e.g., complex karyotype)
     data, col_clinical = add_cytogenetic_features(data)
+
+    # === 3. One-Hot Encoding of Molecular Categories ===
+    # EFFECT: mutation effect types (e.g., missense, frameshift)
     data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
+
+    # CHR: chromosome-level distribution of mutations
     data, chromosomes = one_hot_aggregate(
         molecular_data, data, "CHR", fillna_value="no_chr"
     )
+
+    # GENE: gene-level presence/absence indicators
     data, genes = one_hot_aggregate(
         molecular_data, data, "GENE", fillna_value="no_gene"
     )
 
-    new_feats = list(categories) + list(chromosomes) + list(genes) + list(col_clinical)
+    # Collect all generated feature names
+    new_feats = list(col_clinical) + list(categories) + list(chromosomes) + list(genes)
+
+    # Recompute cytogenetic features for non-molecular patients
+    not_molecular, _ = add_cytogenetic_features(not_molecular)
+
+    # Fill missing molecular features with 0 for non-molecular patients
+    if fill_not_molecular:
+        data = pd.concat([data, not_molecular])
+        data[
+            list(molecular_feat) + list(categories) + list(chromosomes) + list(genes)
+        ] = data[
+            list(molecular_feat) + list(categories) + list(chromosomes) + list(genes)
+        ].fillna(
+            0
+        )
 
     return data, new_feats
 
 
 # %%
-train, feat_train = feat_engineering(data=train, molecular_data=molecular_train)
-# %% Preprocessing Test Data
+# === Apply Feature Engineering ===
 test = clinical_test.set_index("ID").copy()
 not_molecular_test = clinical_test[
     clinical_test["ID"].isin(
@@ -73,29 +112,30 @@ not_molecular_test = clinical_test[
     )
 ].set_index("ID")
 
-test, feat_test = feat_engineering(data=test, molecular_data=molecular_test)
+train, feat_train = feat_engineering(
+    data=train, molecular_data=molecular_train, fill_not_molecular=True
+)
+test, feat_test = feat_engineering(
+    data=test, molecular_data=molecular_test, fill_not_molecular=True
+)
 
 feats = [ft for ft in feat_test if ft in feat_train]
 # %%
-
-not_molecular_test, col_clinical = add_cytogenetic_features(not_molecular_test)
-test = pd.concat([test, not_molecular_test])
-# %%
+# === Define Model Inputs ===
 target = "OS_YEARS"
-features = ["BM_BLAST", "WBC", "HB", "PLT", "Nmut", "VAF", "LENGTH"] + feats
-model_type = "cat"
+features = ["BM_BLAST", "WBC", "HB", "PLT"] + feats
+model_type = "cat"  # Parameters and Model based on previous challenges knowledge tree_based_models/initialise_model.py
 
 # %%
+# === Model Selection with Cross-Validation ===
 model_selection_using_kfold(
     data=train.reset_index(),
     target=target,
     features=features,
     model_type=model_type,
-    feat_engineering=None,
     unique_id="ID",
     plot_ft_importance=True,
     n_splits=6,
-    log=False,
     scale=True,
     n_importance=20,
 )
@@ -106,14 +146,16 @@ model = get_model(model_type=model_type)
 model.fit(train[features], train[target])
 
 # %%
+# === Generate Predictions and Save Submission ===
 preds = -model.predict(test[features])
 
 submission = pd.Series(preds, index=test.index, name="risk_score")
-# %%
+
 submission.to_csv("data/cat_feat_engineering_cypt.csv")
 
 # %%
-len(
-    set(pd.read_csv("data/benchmark_submission.csv")["ID"]) & set(submission.index)
-) / len(set(submission.index))
+benchmark_ids = set(pd.read_csv("data/benchmark_submission.csv")["ID"])
+submission_ids = set(submission.index)
+
+len(benchmark_ids & submission_ids) / len(submission_ids)
 # %%

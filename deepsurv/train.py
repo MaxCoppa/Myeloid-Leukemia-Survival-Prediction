@@ -1,12 +1,3 @@
-"""
-DeepSurv (PyTorch Implementation)
----------------------------------
-Migrated from Lasagne/Theano version.
-
-Dependencies:
-    pip install torch lifelines numpy scikit-learn matplotlib
-"""
-
 import time
 import numpy as np
 import torch
@@ -16,9 +7,6 @@ from torch.utils.data import DataLoader, TensorDataset
 from lifelines.utils import concordance_index
 
 
-# ============================================================
-# Cox Proportional Hazards Loss
-# ============================================================
 def cox_ph_loss(log_hazard, events):
     """
     Negative log partial likelihood of Cox model.
@@ -36,9 +24,6 @@ def cox_ph_loss(log_hazard, events):
     return neg_likelihood
 
 
-# ============================================================
-# Training Utility
-# ============================================================
 def train_deepsurv(
     model,
     x_train,
@@ -72,6 +57,9 @@ def train_deepsurv(
         model.parameters(), lr=lr, momentum=0.9, weight_decay=weight_decay
     )
 
+    # optimizer = torch.optim.Adam(
+    #     model.parameters(), lr=lr, weight_decay=weight_decay
+    # )
     # Convert to tensors
     x_train = torch.tensor(x_train, dtype=torch.float32).to(device)
     e_train = torch.tensor(e_train, dtype=torch.float32).to(device)
@@ -151,4 +139,4 @@ def train_deepsurv(
     if verbose:
         print(f"Training completed in {time.time() - start:.2f}s")
 
-    return history
+    return model

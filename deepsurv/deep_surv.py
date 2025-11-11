@@ -1,19 +1,6 @@
-"""
-DeepSurv (PyTorch Implementation)
----------------------------------
-Migrated from Lasagne/Theano version.
-
-Dependencies:
-    pip install torch lifelines numpy scikit-learn matplotlib
-"""
-
-import time
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset
-from lifelines.utils import concordance_index
 
 
 class DeepSurv(nn.Module):
@@ -72,3 +59,10 @@ class DeepSurv(nn.Module):
     def predict_partial_hazard(self, x):
         """Return exp(F(x))"""
         return np.exp(self.predict_risk(x))
+
+    def predict(self, x):
+        """
+        Compatibility method for evaluation pipelines.
+        Returns predicted log-risk (same as predict_risk).
+        """
+        return self.predict_risk(x)
