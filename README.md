@@ -1,4 +1,4 @@
-# Myeloid Leukemia Survival Prediction — ENS Data Challenge
+# Myeloid Leukemia Survival Prediction - ENS Data Challenge
 
 ## Overview
 
@@ -38,8 +38,8 @@ Two main data tables are provided:
 
 Training labels include:
 
-* **OS_time** — overall survival time
-* **OS_event** — censoring indicator (1 = death, 0 = censored)
+* **OS_time** - overall survival time
+* **OS_event** - censoring indicator (1 = death, 0 = censored)
 
 ---
 
@@ -71,7 +71,7 @@ Training labels include:
 * Random Survival Forests
 * **Concordance Index: 0.7160 ± 0.0192**
 
-### 5. Deep Learning — DeepSurv
+### 5. Deep Learning - DeepSurv
 
 * PyTorch implementation
 * Custom dataloaders and training pipeline
@@ -84,20 +84,20 @@ Training labels include:
 
 ### Notebooks
 
-* **`myeloid_survival_prediction.ipynb`** — End-to-end summary of the full approach
-* **`data_vizualisation.ipynb`** — EDA & feature inspection
-* **`explo_surv_data.ipynb`** — Survival data exploration
-* **`surv_prediction.py`** — Classical Cox and survival models
-* **`deepsurv_prediction.py`** — DeepSurv training & evaluation
-* **`feature_engineering.py`** — Testing and validating feature engineering steps
+* **`myeloid_survival_prediction.ipynb`** - End-to-end summary of the full approach
+* **`data_vizualisation.ipynb`** - EDA & feature inspection
+* **`explo_surv_data.ipynb`** - Survival data exploration
+* **`surv_prediction.py`** - Classical Cox and survival models
+* **`deepsurv_prediction.py`** - DeepSurv training & evaluation
+* **`feature_engineering.py`** - Testing and validating feature engineering steps
 
 ### Modules
 
-* **deepsurv/** — Contains the DeepSurv model, its training pipeline, and utility functions for survival loss, metrics, and IPCW computation.
+* **deepsurv/** - Contains the DeepSurv model, its training pipeline, and utility functions for survival loss, metrics, and IPCW computation.
 
-* **feature_engineering/** — Implements all preprocessing steps, including categorical encoding, cytogenetic parsing, and mutation feature aggregation.
+* **feature_engineering/** - Implements all preprocessing steps, including categorical encoding, cytogenetic parsing, and mutation feature aggregation.
 
-* **tree_based_models/** — Provides pipelines and parameter configurations for training and evaluating classical survival models such as Cox and Random Survival Forests.
+* **tree_based_models/** - Provides pipelines and parameter configurations for training and evaluating classical survival models such as Cox and Random Survival Forests.
 
 ---
 
