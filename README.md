@@ -4,7 +4,7 @@
 
 This repository contains our submission for the **ENS Data Challenge**:
 **“Prédiction de Survie Globale de patients atteints de Leucémie Myéloïde”**
-Challenge link: [https://challengedata.ens.fr/participants/challenges/162/](https://challengedata.ens.fr/participants/challenges/162/)
+Challenge link: [https://challengedata.ens.fr/challenges/162](https://challengedata.ens.fr/challenges/162)
 
 The objective is to predict a **risk score** for overall survival (OS) in adult patients diagnosed with a subtype of myeloid leukemia. Models are evaluated using the **IPCW C-index**, which measures the concordance between predicted risks and observed survival times under right-censoring.
 
