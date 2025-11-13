@@ -1,9 +1,6 @@
 # %%
 """
 DeepSurv Pipeline for Survival Prediction
------------------------------------------
-This script loads AML clinical and molecular data, performs feature engineering,
-and trains a DeepSurv model using k-fold cross-validation.
 """
 
 import pandas as pd
@@ -19,7 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 
 # %%
-# === Load Data ===
+# Load Data
 clinical_train = pd.read_csv("data/X_train/clinical_train.csv")
 clinical_test = pd.read_csv("data/X_test/clinical_test.csv")
 
@@ -79,7 +76,7 @@ def feat_engineering(
 
 
 # %%
-# === Apply Feature Engineering ===
+# Apply Feature Engineering
 test = clinical_test.set_index("ID").copy()
 not_molecular_test = clinical_test[
     clinical_test["ID"].isin(
@@ -102,7 +99,7 @@ test, feat_test = feat_engineering(
 feats = [ft for ft in feat_test if ft in feat_train]
 
 # %%
-# === Define Feature Columns ===
+# Define Feature Columns
 target = "OS_YEARS"
 status = "OS_STATUS"
 features = ["BM_BLAST", "WBC", "HB", "PLT"] + feats
@@ -116,7 +113,7 @@ lr = 1e-4
 weight_decay = 1e-4
 
 # %%
-# === Model Selection with Cross-Validation ===
+# Model Selection with Cross-Validation
 results = model_selection_using_kfold_deepsurv(
     data=train.reset_index(),
     features=features,
@@ -132,7 +129,7 @@ results = model_selection_using_kfold_deepsurv(
 )
 
 # %%
-# === Data Preprocessing (Imputation + Scaling) ===
+# Data Preprocessing (Imputation + Scaling)
 X_train = train[features]
 X_test = test[features]
 t_train = train[target]
@@ -148,7 +145,7 @@ X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
 # %%
-# === Train Final DeepSurv Model ===
+# Train Final DeepSurv Model
 n_in = X_train.shape[1]
 model = DeepSurv(
     n_in=n_in,
@@ -169,7 +166,7 @@ model = train_deepsurv(
     verbose=True,
 )
 # %%
-# === Generate Predictions and Save Submission ===
+# Generate Predictions and Save Submission
 preds = model.predict(X_test)
 
 submission = pd.Series(preds, index=test.index, name="risk_score")

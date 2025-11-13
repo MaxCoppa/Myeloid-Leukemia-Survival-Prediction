@@ -1,9 +1,6 @@
 # %%
 """
 Comprehensive Feature Engineering for Survival Modeling
-------------------------------------------------------
-This script applies an extended feature engineering pipeline combining
-clinical, molecular, and cytogenetic data for survival prediction.
 """
 
 import numpy as np
@@ -55,17 +52,17 @@ def feat_engineering(
     ]
     not_molecular = data[data.index.isin(ids_not_molecular)]
 
-    # === 1. Molecular Features ===
+    # 1. Molecular Features
     # Aggregates mutation-based numerical features (e.g., count, mean VAF, length)
     data, molecular_feat = create_molecular_feat(
         data=data, molecular_data=molecular_data
     )
 
-    # === 2. Cytogenetic Features ===
+    # 2. Cytogenetic Features
     # Adds features describing cytogenetic abnormalities (e.g., complex karyotype)
     data, col_clinical = add_cytogenetic_features(data)
 
-    # === 3. One-Hot Encoding of Molecular Categories ===
+    # 3. One-Hot Encoding of Molecular Categories
     # EFFECT: mutation effect types (e.g., missense, frameshift)
     data, categories = one_hot_aggregate(molecular_data, data, "EFFECT")
 
@@ -100,7 +97,7 @@ def feat_engineering(
 
 
 # %%
-# === Apply Feature Engineering ===
+# Apply Feature Engineering
 test = clinical_test.set_index("ID").copy()
 not_molecular_test = clinical_test[
     clinical_test["ID"].isin(
@@ -121,13 +118,13 @@ test, feat_test = feat_engineering(
 
 feats = [ft for ft in feat_test if ft in feat_train]
 # %%
-# === Define Model Inputs ===
+# Define Model Inputs
 target = "OS_YEARS"
 features = ["BM_BLAST", "WBC", "HB", "PLT"] + feats
 model_type = "cat"  # Parameters and Model based on previous challenges knowledge tree_based_models/initialise_model.py
 
 # %%
-# === Model Selection with Cross-Validation ===
+# Model Selection with Cross-Validation
 model_selection_using_kfold(
     data=train.reset_index(),
     target=target,
@@ -146,7 +143,7 @@ model = get_model(model_type=model_type)
 model.fit(train[features], train[target])
 
 # %%
-# === Generate Predictions and Save Submission ===
+# Generate Predictions and Save Submission
 preds = -model.predict(test[features])
 
 submission = pd.Series(preds, index=test.index, name="risk_score")

@@ -1,10 +1,6 @@
 # %%
 """
 Tree-Based Survival Modeling Pipeline
--------------------------------------
-This script performs feature engineering and trains tree-based survival models
-(Random Survival Forest, Gradient Boosting Survival Analysis) using AML clinical
-and molecular datasets.
 """
 
 import pandas as pd
@@ -22,7 +18,7 @@ from feature_engineering import (
 from sksurv.util import Surv
 
 # %%
-# === Load Data ===
+# Load Data
 # Clinical Data
 clinical_train = pd.read_csv("data/X_train/clinical_train.csv")
 clinical_test = pd.read_csv("data/X_test/clinical_test.csv")
@@ -83,7 +79,7 @@ def feat_engineering(
 
 
 # %%
-# === Apply Feature Engineering ===
+# Apply Feature Engineering
 test = clinical_test.set_index("ID").copy()
 not_molecular_test = clinical_test[
     clinical_test["ID"].isin(
@@ -105,13 +101,13 @@ test, feat_test = feat_engineering(
 # Align train/test feature sets
 feats = [ft for ft in feat_test if ft in feat_train]
 # %%
-# === Define Feature Columns ===
+# Define Feature Columns
 target = "OS_YEARS"
 status = "OS_STATUS"
 features = ["BM_BLAST", "WBC", "HB", "PLT"] + feats
 
 # %%
-# === Select and Configure Tree-Based Model ===
+# Select and Configure Tree-Based Model
 
 # Test Random Survival Forest
 model_cls = RandomSurvivalForest
@@ -138,7 +134,7 @@ model_params = {
 # }
 
 # %%
-# === Model Selection via K-Fold Cross Validation ===
+# Model Selection via K-Fold Cross Validation
 model_selection_using_kfold_surv(
     data=train.reset_index(),
     target=target,
@@ -154,7 +150,7 @@ model_selection_using_kfold_surv(
 )
 
 # %%
-# === Training model on full dataset ===
+# Training model on full dataset
 X_train = train[features]
 X_test = test[features]
 
@@ -168,7 +164,7 @@ model = model_cls(**model_params)
 model.fit(X_train, y_train)
 
 # %%
-# === Generate Predictions and Save Submission ===
+# Generate Predictions and Save Submission
 preds = model.predict(X_test)
 
 submission = pd.Series(preds, index=test.index, name="risk_score")
